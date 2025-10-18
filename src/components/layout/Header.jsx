@@ -72,8 +72,8 @@ const Header = () => {
             />
           </div>
 
-          <BsPersonFill className="cursor-pointer text-2xl hover:text-gray-600 transition" />
-          <BsCart3 className="cursor-pointer text-2xl hover:text-gray-600 transition" />
+          <BsPersonFill className="cursor-pointer text-2xl hover:scale-130 duration-300" />
+          <BsCart3 className="cursor-pointer text-2xl hover:scale-130 duration-300" />
         </div>
       </div>
 
