@@ -20,7 +20,7 @@ const Header = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 shadow-lg ${
         scrolled ? "bg-white/90 shadow-lg backdrop-blur-md" : "bg-white"
       }`}
     >
