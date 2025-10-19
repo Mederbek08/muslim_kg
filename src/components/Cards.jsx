@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Package, DollarSign, Box, Loader2, AlertTriangle, ShoppingCart, Tag, CheckCircle, Image as ImageIcon } from 'lucide-react'; 
 
 // URL фейкового API, который возвращает МАССИВ объектов
@@ -142,30 +141,6 @@ const ProductListing = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const fetchProducts = async () => {
-        try {
-            const response = await axios.get(API_URL);
-            
-            const adaptedProducts = response.data.map((item, index) => ({
-                id: item.id,
-                title: `Товар #${item.id} - ${item.title.substring(0, 15)}...`,
-                price: (25000 / (index + 1)).toFixed(2), 
-                inStock: (5 - index) > 0 ? (5 - index) : 0, 
-                description: item.body.substring(0, 80) + '...',
-                imageUrl: `https://via.placeholder.com/400x200?text=Product+${item.id}` 
-            }));
-            
-            setProducts(adaptedProducts);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    useEffect(() => {
-        fetchProducts();
-    }, []);
 
     // ... (Блоки загрузки и ошибки остаются без изменений) ...
 
