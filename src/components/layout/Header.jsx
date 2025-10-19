@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Menu, X, User, ShoppingCart, Search } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,12 +104,13 @@ const Header = () => {
             <Search className="w-5 h-5" />
           </button>
 
-          <button
+          <NavLink
             className="text-gray-800 hover:text-purple-600 transition-all duration-200 hover:scale-110 active:scale-95"
             aria-label="User profile"
+            to="/login"
           >
             <User className="w-5 h-5" />
-          </button>
+          </NavLink>
           
           <button
             className="text-gray-800 hover:text-purple-600 transition-all duration-200 hover:scale-110 active:scale-95 relative"
