@@ -1,10 +1,14 @@
 import React from 'react'
-import Banner from '../components/Banner'
+import Header from '../components/layout/Header'
+import Footer from '../components/Footer'
+import Slider from '../components/Slider'
 
 function Home() {
   return (
-    <div className='text-3xl'>
-        <Banner/>  
+    <div>
+      <Header />
+      <Slider />
+      <Footer />
     </div>
   )
 }
