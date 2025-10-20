@@ -1,9 +1,10 @@
 import React from 'react';
 import { Instagram, Send, Youtube, Mail, Phone, MapPin, Facebook, Twitter } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 
 function Footer() {
   return (
-    <footer className="bg-gradient-to-b from-gray-900 to-black text-white mt-20">
+    <footer className="bg-gradient-to-b from-gray-900 to-black text-white ">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
@@ -48,9 +49,9 @@ function Footer() {
             <h3 className="text-lg font-bold mb-4 text-white">Информация</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#about" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
+                <NavLink to="/about" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
                   О нас
-                </a>
+                </NavLink>
               </li>
               <li>
                 <a href="#policy" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
@@ -69,9 +70,9 @@ function Footer() {
           <div className="text-center md:text-left">
             <h3 className="text-lg font-bold mb-4 text-white">Связаться с нами</h3>
             <div className="space-y-3 mb-6">
-              <a href="tel:+996" className="flex items-center justify-center md:justify-start gap-2 text-gray-400 hover:text-purple-400 transition-colors text-sm">
+              <a href="tel:+996050207" className="flex items-center justify-center md:justify-start gap-2 text-gray-400 hover:text-purple-400 transition-colors text-sm">
                 <Phone className="w-4 h-4" />
-                <span>+996 XXX XXX XXX</span>
+                <span>+996 999 050 207</span>
               </a>
               <a href="mailto:info@muslim.kg" className="flex items-center justify-center md:justify-start gap-2 text-gray-400 hover:text-purple-400 transition-colors text-sm">
                 <Mail className="w-4 h-4" />

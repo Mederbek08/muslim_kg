@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, DollarSign, Box, Loader2, AlertTriangle, ShoppingCart, Tag, CheckCircle, Image as ImageIcon } from 'lucide-react'; 
+import { Package, Loader2, AlertTriangle, ShoppingCart, CheckCircle, Box, Image } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useCart } from './CartContext';
 
-// URL фейкового API, который возвращает МАССИВ объектов
-const API_URL = 'https://jsonplaceholder.typicode.com/posts?_limit=4'; // Увеличим до 4 товаров
-
-// ... (Вспомогательные компоненты Alert и formatSom остаются без изменений) ...
 
 // =============================================================
 // --- Вспомогательные Компоненты / Функции ---
@@ -34,8 +33,8 @@ const formatSom = (amount) => {
     return new Intl.NumberFormat('ru-RU', { 
         style: 'currency', 
         currency: 'KGS', 
-        minimumFractionDigits: 2 
-    }).format(amount).replace('KGS', 'СОМ');
+        minimumFractionDigits: 0 
+    }).format(amount).replace('KGS', '₽');
 };
 
 // =============================================================
@@ -43,22 +42,32 @@ const formatSom = (amount) => {
 // =============================================================
 
 const ProductCard = ({ product }) => {
-    const [alert, setAlert] = useState(null); 
-    const { title, price, inStock, description, imageUrl } = product; 
+    const [alert, setAlert] = useState(null);
+    const { addToCart, toggleCart } = useCart();
+    const { id, title, price, stock, category, imageUrl } = product; 
     
     const handlePurchase = () => {
-        setAlert({
-            message: `Товар #${product.id} добавлен в корзину!`,
-            type: 'success'
-        });
+        if (stock > 0) {
+            addToCart(product);
+            setAlert({
+                message: `${title} добавлен в корзину!`,
+                type: 'success'
+            });
+            
+            setTimeout(() => {
+                toggleCart();
+            }, 500);
+        }
     };
 
-    const formattedPrice = formatSom(parseFloat(price));
+    // Используем price как число, если оно существует, иначе 0
+    const formattedPrice = formatSom(parseFloat(price || 0));
+    const inStock = stock > 0;
 
     return (
       <div className="relative w-full rounded-2xl shadow-xl 
                       bg-gradient-to-r from-purple-600 to-blue-500 
-                      p-0.5 transform hover:scale-[1.03] transition duration-300">
+                      p-0.5 transform hover:scale-[1.03] transition duration-300 b-0">
           
           {alert && (
               <Alert 
@@ -71,7 +80,10 @@ const ProductCard = ({ product }) => {
           <div className="p-6 rounded-[calc(1.5rem-2px)] backdrop-filter backdrop-blur-lg bg-black bg-opacity-20 
                           flex flex-col space-y-4 h-full text-white">
               
-              {/* Изображение Товара - Адаптивная высота */}
+              <div className="absolute top-8 right-8 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-purple-600">{category}</span>
+              </div>
+
               <div className="w-full h-40 md:h-48 bg-gray-200 rounded-lg overflow-hidden mb-2 relative">
                   {imageUrl ? (
                       <img 
@@ -81,12 +93,11 @@ const ProductCard = ({ product }) => {
                       />
                   ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500">
-                          <ImageIcon className="w-12 h-12"/>
+                          <Image className="w-12 h-12"/>
                       </div>
                   )}
               </div>
 
-              {/* НАЗВАНИЕ ТОВАРА */}
               <div className="flex items-start space-x-3">
                   <Package className="w-6 h-6 text-yellow-300 mt-1 flex-shrink-0" />
                   <h2 className="text-xl font-extrabold leading-snug flex-grow">
@@ -94,8 +105,6 @@ const ProductCard = ({ product }) => {
                   </h2>
               </div>
 
-              {/* ЦЕНА (СОМ) */}
-              {/* Адаптивный размер текста цены */}
               <div className="flex items-end justify-between border-t border-white border-opacity-30 pt-4">
                   <div className="flex flex-col">
                       <span className="text-sm font-light opacity-80">Цена:</span>
@@ -103,29 +112,24 @@ const ProductCard = ({ product }) => {
                           {formattedPrice}
                       </p>
                   </div>
+                  <div className="flex flex-col items-end">
+                      <span className="text-sm font-light opacity-80">В наличии:</span>
+                      <p className={`text-lg font-bold ${inStock ? 'text-green-300' : 'text-red-300'}`}>
+                          {stock} шт
+                      </p>
+                  </div>
               </div>
 
-              {/* ОПИСАНИЕ */}
-              <div className="pt-2">
-                  <p className="text-sm font-semibold mb-1 flex items-center space-x-1 opacity-80">
-                     <Tag className="w-4 h-4 opacity-70"/> Краткое описание:
-                  </p>
-                  {/* Адаптивный размер текста описания */}
-                  <p className="text-xs sm:text-sm opacity-90 leading-normal">
-                    {description}
-                  </p>
-              </div>
-
-              {/* КНОПКА CTA - Адаптивный размер */}
               <button 
                 className="w-full py-3 mt-4 bg-white text-purple-600 font-bold text-base md:text-lg 
                            rounded-lg shadow-lg hover:shadow-xl transition duration-200 
-                           flex items-center justify-center space-x-2 disabled:opacity-50"
+                           flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed
+                           hover:scale-105 active:scale-95"
                 onClick={handlePurchase}
-                disabled={inStock <= 0}
+                disabled={!inStock}
               >
                 <ShoppingCart className="w-5 h-5"/>
-                <span>{inStock > 0 ? 'Добавить в корзину' : 'Нет в наличии'}</span>
+                <span>{inStock ? 'Добавить в корзину' : 'Нет в наличии'}</span>
               </button>
           </div>
       </div>
@@ -133,22 +137,70 @@ const ProductCard = ({ product }) => {
 };
 
 // =============================================================
-// --- 2. ProductListing (Родительский компонент: Загрузка данных) ---
+// --- 2. Cards (Родительский компонент: Загрузка и Фильтрация) ---
 // =============================================================
 
-const ProductListing = () => {
+const Cards = ({ searchTerm, categoryFilter, onCategorySelect }) => {
+    
     const [products, setProducts] = useState([]); 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                
+                const querySnapshot = await getDocs(collection(db, 'products'));
+                const productsData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                setProducts(productsData);
+            } catch (err) {
+                console.error('Ошибка загрузки товаров:', err);
+                setError(err.message || 'Не удалось загрузить товары');
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-    // ... (Блоки загрузки и ошибки остаются без изменений) ...
+        fetchProducts();
+    }, []);
+
+    
+    // --- ЛОГИКА ФИЛЬТРАЦИИ И ПОИСКА ---
+    
+    // 1. Фильтрация по категории
+    const filteredByCategory = categoryFilter === '' || categoryFilter === 'Все товары'
+        ? products 
+        : products.filter(p => p.category === categoryFilter);
+
+    // 2. Фильтрация по поисковому запросу (Здесь главное исправление!)
+    const finalFilteredProducts = filteredByCategory.filter(p => {
+        if (!searchTerm) return true;
+        
+        const searchLower = searchTerm.toLowerCase();
+        
+        // 🚨 Убедимся, что p.title и p.category существуют и являются строками, прежде чем вызывать toLowerCase()
+        const titleMatch = p.title && String(p.title).toLowerCase().includes(searchLower);
+        const categoryMatch = p.category && String(p.category).toLowerCase().includes(searchLower);
+        
+        return titleMatch || categoryMatch;
+    });
+
+    // Получаем уникальные категории для кнопок
+    const categories = ['Все товары', ...new Set(products.map(p => p.category))];
+    
+    // --- Отображение состояний (Loader, Error) ---
 
     if (isLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen p-4">
             <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-            <p className="ml-3 text-gray-700 font-semibold">Загрузка списка товаров...</p>
+            <p className="ml-3 text-gray-700 font-semibold">Загрузка товаров из базы данных...</p>
         </div>
       );
     }
@@ -157,29 +209,91 @@ const ProductListing = () => {
       return (
         <div className="flex items-center justify-center min-h-screen p-4">
             <AlertTriangle className="w-10 h-10 text-red-500" />
-            <p className="ml-3 text-red-700 font-bold">Ошибка загрузки списка: {error}</p>
+            <p className="ml-3 text-red-700 font-bold">Ошибка: {error}</p>
+        </div>
+      );
+    }
+
+    if (products.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+            <Box className="w-16 h-16 text-gray-400 mb-4" />
+            <p className="text-xl text-gray-600  font-semibold sm:ml-10">Отсуствует подключение к интернету</p>
+            <p className="text-sm text-gray-500 mt-2">КОД ОШИБКИ:404</p>
         </div>
       );
     }
     
-    // --- Рендеринг списка карточек через map() ---
+    // --- Основной Рендер ---
     return (
         <div className="min-h-screen p-4 sm:p-8 bg-gray-100">
             <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800 text-center">
-                Наши Рекомендуемые Товары
+                {searchTerm || categoryFilter ? "Результаты поиска и фильтрации" : "Наши Товары"}
             </h1>
             
-            {/* ⬅️ КЛЮЧЕВОЙ МОМЕНТ: АДАПТИВНАЯ СЕТКА */}
+            {/* Фильтр по категориям */}
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
+                {categories.map(cat => (
+                    <button
+                        key={cat}
+                        onClick={() => onCategorySelect(cat === 'Все товары' ? '' : cat)}
+                        className={`px-4 py-2 rounded-full font-semibold transition-all duration-200
+                            ${(categoryFilter === cat || (categoryFilter === '' && cat === 'Все товары'))
+                                ? 'bg-purple-600 text-white shadow-lg scale-105' 
+                                : 'bg-white text-gray-700 hover:bg-gray-200'
+                            }`}
+                    >
+                        {cat} ({cat === 'Все товары' ? products.length : products.filter(p => p.category === cat).length})
+                    </button>
+                ))}
+            </div>
+
+            {/* Статистика */}
+            <div className="max-w-4xl mx-auto mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg shadow-md p-4 text-center">
+                    <p className="text-gray-600 text-sm mb-1">Найдено товаров</p>
+                    <p className="text-2xl font-bold text-purple-600">{finalFilteredProducts.length}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 text-center">
+                    <p className="text-gray-600 text-sm mb-1">В наличии</p>
+                    <p className="text-2xl font-bold text-green-600">
+                        {finalFilteredProducts.filter(p => p.stock > 0).length}
+                    </p>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 text-center">
+                    <p className="text-gray-600 text-sm mb-1">Средняя цена</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                        {finalFilteredProducts.length > 0 
+                            // Убедимся, что price - число, если оно существует
+                            ? formatSom(finalFilteredProducts.reduce((sum, p) => sum + (p.price || 0), 0) / finalFilteredProducts.length)
+                            : '0 ₽'
+                        }
+                    </p>
+                </div>
+            </div>
+            
+            {/* Сетка товаров */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
-                {products.map((product) => (
+                {finalFilteredProducts.map((product) => (
                     <ProductCard 
                         key={product.id} 
                         product={product} 
                     />
                 ))}
             </div>
+
+            {finalFilteredProducts.length === 0 && (
+                <div className="text-center py-12">
+                    <p className="text-xl text-gray-600">
+                        Ничего не найдено по запросу 
+                        <span className="font-bold text-purple-600 ml-1">
+                            "{searchTerm || categoryFilter || 'Все товары'}"
+                        </span>
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
 
-export default ProductListing;
+export default Cards;

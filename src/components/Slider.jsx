@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ShoppingBag, Star, TrendingUp } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 
 const Slider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  
 
   const slides = [
     {
@@ -68,7 +70,7 @@ const Slider = () => {
   };
 
   return (
-    <div className="relative w-full h-screen min-h-[600px] overflow-hidden bg-gradient-to-br from-purple-600 to-blue-500">
+    <div className="relative w-full h-screen min-h-[600px] overflow-hidden bg-gradient-to-br from-purple-600 to-blue-500 ">
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-64 sm:h-64 lg:w-96 lg:h-96 bg-white rounded-full filter blur-3xl animate-pulse"></div>
@@ -125,9 +127,9 @@ const Slider = () => {
                   <button className="px-6 py-3 sm:px-8 sm:py-4 bg-white text-purple-600 rounded-full font-bold text-base sm:text-lg hover:bg-gray-100 transform hover:scale-105 transition-all duration-300 shadow-2xl">
                     Купить сейчас
                   </button>
-                  <button className="px-6 py-3 sm:px-8 sm:py-4 bg-white/20 backdrop-blur-md text-white rounded-full font-bold text-base sm:text-lg hover:bg-white/30 transform hover:scale-105 transition-all duration-300 border-2 border-white/50">
+                  <NavLink to='/about' className="px-6 py-3 sm:px-8 sm:py-4 bg-white/20 backdrop-blur-md text-white rounded-full font-bold text-base sm:text-lg hover:bg-white/30 transform hover:scale-105 transition-all duration-300 border-2 border-white/50">
                     Узнать больше
-                  </button>
+                  </NavLink>
                 </div>
               </div>
 

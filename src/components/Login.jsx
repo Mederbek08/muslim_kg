@@ -1,16 +1,15 @@
 // src/pages/Login.jsx
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import { Lock, User, Key, AlertTriangle } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
+  const [success, setSuccess] = useState(""); // Оставляем для потенциальных будущих сообщений
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -18,155 +17,100 @@ const Login = () => {
     setError("");
     setSuccess("");
     
+    if (!email || !password) {
+      setError("❌ Пожалуйста, введите Email и Пароль.");
+      return;
+    }
+    
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigate("/admin");
     } catch (err) {
-      setError("❌ Туура эмес логин же сырсөз");
-    }
-  };
-
-  const handlePasswordReset = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!resetEmail) {
-      setError("❌ Email дарегиңизди киргизиңиз");
-      return;
-    }
-
-    try {
-      // Firebase'ке туташууну текшерүү
-      await sendPasswordResetEmail(auth, resetEmail, {
-        url: window.location.origin + '/login',
-        handleCodeInApp: false
-      });
-      
-      setSuccess("✅ Сырсөздү калыбына келтирүү үчүн шилтеме email'ге жөнөтүлдү!");
-      setTimeout(() => {
-        setShowResetModal(false);
-        setResetEmail("");
-        setSuccess("");
-      }, 3000);
-    } catch (err) {
-      console.error("Reset error:", err);
-      
-      if (err.code === "auth/user-not-found") {
-        setError("❌ Бул email табылган жок");
-      } else if (err.code === "auth/invalid-email") {
-        setError("❌ Туура эмес email формат");
+      // Улучшенная обработка ошибок Firebase
+      if (err.code === "auth/invalid-email" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+        setError("❌ Неверный Email или Пароль.");
       } else if (err.code === "auth/network-request-failed") {
-        setError("❌ Интернет байланышы жок. Текшериңиз");
-      } else if (err.code === "auth/too-many-requests") {
-        setError("❌ Өтө көп аракет. Бир аздан кийин кайталаңыз");
+        setError("❌ Ошибка сети. Проверьте подключение к Интернету.");
       } else {
-        setError(`❌ Ката: ${err.message || "Кайра аракет кылыңыз"}`);
+        setError("❌ Произошла ошибка. Повторите попытку.");
       }
+      console.error("Login error:", err);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white shadow-xl rounded-2xl p-8 w-[90%] max-w-[400px] flex flex-col gap-5"
-      >
-        <h2 className="text-2xl font-bold text-center text-gray-800">🔑 Кирүү</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden transform transition duration-500 hover:shadow-purple-500/50">
         
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        
-        <input
-          type="password"
-          placeholder="Сырсөз"
-          className="border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        {success && <p className="text-green-500 text-sm text-center">{success}</p>}
-        
-        <button
-          type="submit"
-          className="bg-green-600 hover:bg-green-700 text-white py-3 rounded-md font-semibold transition"
-        >
-          Кирүү
-        </button>
+        {/* Шапка/Предупреждение */}
+        <div className="bg-gradient-to-r from-purple-700 to-blue-600 p-6 flex flex-col items-center">
+          <Lock className="w-10 h-10 text-white mb-2" />
+          <h2 className="text-3xl font-extrabold text-white">Вход для Администратора</h2>
+          <p className="text-white/80 text-sm mt-1">Доступ разрешен только персоналу.</p>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setShowResetModal(true)}
-          className="text-sm text-blue-600 hover:text-blue-800 underline transition"
+        <form
+          onSubmit={handleLogin}
+          className="p-8 flex flex-col gap-5"
         >
-          Сырсөздү унуттуңузбу?
-        </button>
-      </form>
-
-      {/* Password Reset Modal */}
-      {showResetModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-            onClick={() => setShowResetModal(false)}
-          />
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <form
-              onSubmit={handlePasswordReset}
-              className="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-[400px] flex flex-col gap-5"
-            >
-              <h3 className="text-xl font-bold text-center text-gray-800">
-                🔄 Сырсөздү калыбына келтирүү
-              </h3>
-              
-              <p className="text-sm text-gray-600 text-center">
-                Email дарегиңизди киргизиңиз. Сизге сырсөздү калыбына келтирүү үчүн шилтеме жөнөтөбүз.
-              </p>
-              
-              <input
-                type="email"
-                placeholder="Email"
-                className="border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                required
-              />
-              
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-              {success && <p className="text-green-500 text-sm text-center">{success}</p>}
-              
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-semibold transition"
-                >
-                  Жөнөтүү
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowResetModal(false);
-                    setResetEmail("");
-                    setError("");
-                    setSuccess("");
-                  }}
-                  className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-md font-semibold transition"
-                >
-                  Жокко чыгаруу
-                </button>
-              </div>
-            </form>
+          
+          {/* Предупреждение о доступе */}
+          <div className="flex items-start p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <p className="ml-3 text-sm font-medium">
+              Внимание! Это служебная страница. Используйте учетные данные администратора.
+            </p>
           </div>
-        </>
-      )}
+          
+          {/* Email Input */}
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="email"
+              placeholder="Email Администратора"
+              className="w-full border border-gray-300 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow duration-300"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          
+          {/* Password Input */}
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="password"
+              placeholder="Пароль"
+              className="w-full border border-gray-300 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow duration-300"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          
+          {/* Сообщения */}
+          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
+          {success && <p className="text-green-500 text-sm text-center font-medium">{success}</p>}
+          
+          {/* Кнопка входа */}
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 
+                       text-white py-3 rounded-xl font-bold text-lg 
+                       shadow-md shadow-purple-500/50 transition duration-300 
+                       transform hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-4 ring-purple-300"
+          >
+            Войти в Панель
+          </button>
+          
+          {/* Кнопка сброса пароля полностью удалена */}
+
+        </form>
+        
+        <div className="p-4 bg-gray-50 border-t text-center text-xs text-gray-500">
+          <p>&copy; 2024 Muslim_Kg. Все права защищены.</p>
+        </div>
+      </div>
     </div>
   );
 };

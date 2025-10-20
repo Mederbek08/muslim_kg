@@ -1,9 +1,8 @@
 // src/pages/Admin.jsx
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth, db, storage } from "../firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db } from "../firebase";
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { FaMoon } from "react-icons/fa";
 import { AiOutlineLogout, AiOutlinePlus } from "react-icons/ai";
@@ -14,20 +13,50 @@ const Admin = () => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [image, setImage] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         navigate("/login");
+        setLoading(false);
       } else {
-        setUser(currentUser);
+        // Проверяем роль пользователя в Firestore
+        try {
+          const userDocRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.role === "admin") {
+              setUser(currentUser);
+              setIsAdmin(true);
+              setLoading(false);
+            } else {
+              // Не админ - перенаправляем на главную
+              alert("⛔ У вас нет прав доступа к админ-панели!");
+              navigate("/");
+              setLoading(false);
+            }
+          } else {
+            // Документ пользователя не найден
+            alert("⛔ Пользователь не найден в базе данных!");
+            navigate("/");
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error("Ошибка проверки роли:", error);
+          alert("⛔ Ошибка проверки доступа!");
+          navigate("/");
+          setLoading(false);
+        }
       }
     });
     return () => unsubscribe();
@@ -40,10 +69,10 @@ const Admin = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && isAdmin) {
       fetchProducts();
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   const fetchProducts = async () => {
     try {
@@ -70,11 +99,9 @@ const Admin = () => {
     }
 
     try {
-      // Сүрөт URL колдонобуз (Storage'сиз)
       const finalImageUrl = imageUrl || "https://via.placeholder.com/400x300?text=No+Image";
 
       if (editingId) {
-        // Өзгөртүү
         const productRef = doc(db, "products", editingId);
         await updateDoc(productRef, {
           category,
@@ -87,7 +114,6 @@ const Admin = () => {
         alert("✅ Товар ийгиликтүү өзгөртүлдү!");
         setEditingId(null);
       } else {
-        // Жаңы кошуу
         await addDoc(collection(db, "products"), {
           category,
           title,
@@ -103,7 +129,6 @@ const Admin = () => {
       setTitle("");
       setPrice("");
       setStock("");
-      setImage(null);
       setImageUrl("");
       fetchProducts();
     } catch (error) {
@@ -141,18 +166,30 @@ const Admin = () => {
     setTitle("");
     setPrice("");
     setStock("");
-    setImage(null);
     setImageUrl("");
   };
 
-  if (!user) return null;
+  // Показываем загрузку пока проверяем доступ
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600 font-semibold">Текшерүү...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Если не админ или нет пользователя - ничего не показываем (перенаправление уже произошло)
+  if (!user || !isAdmin) return null;
 
   const totalProducts = products.length;
   const totalValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - Header.jsx стилинде */}
+      {/* Header */}
       <header
         className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 shadow-lg ${
           scrolled ? "bg-white/90 shadow-lg backdrop-blur-md" : "bg-white"
@@ -166,13 +203,18 @@ const Admin = () => {
             </span>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition-colors font-semibold"
-          >
-            <AiOutlineLogout className="text-xl" />
-            Чыгуу
-          </button>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600 hidden md:block">
+              👤 {user?.email}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition-colors font-semibold"
+            >
+              <AiOutlineLogout className="text-xl" />
+              Чыгуу
+            </button>
+          </div>
         </div>
       </header>
 
