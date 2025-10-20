@@ -187,7 +187,7 @@ const Admin = () => {
           
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-600">
             <p className="text-gray-600 text-sm font-semibold mb-1">Жалпы наркы</p>
-            <p className="text-3xl font-bold text-black">{totalValue.toLocaleString()} ₽</p>
+            <p className="text-3xl font-bold text-black">{totalValue.toLocaleString()} сом</p>
           </div>
           
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-400">
@@ -289,7 +289,7 @@ const Admin = () => {
                 <h3 className="font-bold text-lg text-black mb-2 truncate">{product.title}</h3>
                 
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-2xl font-bold text-black">{product.price?.toLocaleString()} ₽</span>
+                  <span className="text-2xl font-bold text-black">{product.price?.toLocaleString()} сом</span>
                   <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-800">
                     {product.stock || 0} дана
                   </span>
