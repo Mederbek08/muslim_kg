@@ -55,7 +55,7 @@ const Header = ({ onSearch, onCategorySelect }) => {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 w-full transition-all p-2 duration-300 backdrop-blur-md shadow-lg`}
+        className={`fixed top-0 left-0 w-full transition-all p-2  duration-300 backdrop-blur-md shadow-lg`}
         style={{ zIndex: 100 }}
       >
         
@@ -90,7 +90,7 @@ const Header = ({ onSearch, onCategorySelect }) => {
 
           
           <nav className="hidden md:flex gap-6 lg:gap-10 font-semibold text-gray-700 text-base lg:text-lg">
-            {["Все товары", "Одежда", "Техника", "Спорт", "Аксессуары", "Обувь"].map((item) => (
+            {["Все", "Одежда", "Техника", "Спорт", "Аксессуары", "Обувь"].map((item) => (
               <button
                 key={item}
                 onClick={() => onCategorySelect(item === "Все товары" ? "" : item)} 

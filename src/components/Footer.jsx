@@ -29,9 +29,9 @@ function Footer() {
 
           {/* Quick Links */}
           <div className="text-center md:text-left">
-            <h3 className="text-lg font-bold mb-4 text-white">Категории</h3>
+            <h3 className="text-lg font-bold mb-4 text-white">Разработчики</h3>
             <ul className="space-y-2">
-              {['Одежда', 'Техника', 'Спорт', 'Аксессуары', 'Обувь'].map((item) => (
+              {['ASke-dev', 'Mederbek08',].map((item) => (
                 <li key={item}>
                   <a
                     href={`#${item.toLowerCase()}`}
@@ -54,9 +54,9 @@ function Footer() {
                 </NavLink>
               </li>
               <li>
-                <a href="#policy" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
+                <NavLink to="/policy" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
                   Политика конфиденциальности
-                </a>
+                </NavLink>
               </li>
               <li>
                 <a href="#contacts" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 text-sm inline-block hover:translate-x-1 transform">
@@ -129,29 +129,7 @@ function Footer() {
           <p className="text-sm text-gray-400">
             © 2025 Muslim_kg. Все права защищены.
           </p>
-          <div className="flex gap-4">
-            <a
-              href="#"
-              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-blue-700 transition-colors"
-              aria-label="Facebook"
-            >
-              <Facebook className="w-5 h-5" />
-            </a>
-            <a
-              href="#"
-              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-purple-600 transition-colors"
-              aria-label="Instagram"
-            >
-              <Instagram className="w-5 h-5" />
-            </a>
-            <a
-              href="#"
-              className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-blue-400 transition-colors"
-              aria-label="Twitter"
-            >
-              <Twitter className="w-5 h-5" />
-            </a>
-          </div>
+   
         </div>
       </div>
     </footer>
