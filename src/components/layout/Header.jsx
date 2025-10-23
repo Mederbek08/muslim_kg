@@ -55,7 +55,7 @@ const Header = ({ onSearch, onCategorySelect }) => {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 w-full transition-all p-2  duration-300 backdrop-blur-md shadow-lg`}
+        className={`fixed top-0 left-0 w-full transition-all  duration-300 backdrop-blur-md shadow-lg`}
         style={{ zIndex: 100 }}
       >
         
@@ -93,7 +93,7 @@ const Header = ({ onSearch, onCategorySelect }) => {
             {["Все", "Одежда", "Техника", "Спорт", "Аксессуары", "Обувь"].map((item) => (
               <button
                 key={item}
-                onClick={() => onCategorySelect(item === "Все товары" ? "" : item)} 
+                onClick={() => onCategorySelect(item === "Все" ? "" : item)} 
                 className="hover:text-purple-600 transition-colors duration-200 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-purple-600 hover:after:w-full after:transition-all after:duration-300"
               >
                 {item}

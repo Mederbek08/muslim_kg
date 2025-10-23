@@ -70,7 +70,7 @@ const Slider = () => {
   };
 
   return (
-    <div className="relative w-full h-screen min-h-[600px] overflow-hidden bg-gradient-to-br from-purple-600 to-blue-500 ">
+    <div className="relative w-full h-screen min-h-[600px] overflow-hidden bg-gradient-to-br from-purple-600 to-blue-500 mt-0 ">
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-64 sm:h-64 lg:w-96 lg:h-96 bg-white rounded-full filter blur-3xl animate-pulse"></div>
