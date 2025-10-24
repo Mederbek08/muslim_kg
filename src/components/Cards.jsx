@@ -39,7 +39,7 @@ const formatSom = (amount) => {
         style: 'currency', 
         currency: 'KGS', 
         minimumFractionDigits: 0 
-    }).format(amount).replace('KGS', '₽');
+    }).format(amount).replace('KGS', 'Сом');
 };
 
 // =============================================================

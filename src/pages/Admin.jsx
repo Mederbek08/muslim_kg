@@ -1,309 +1,312 @@
-// src/pages/Admin.jsx
 import React, { useState, useEffect } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
+  getDoc,
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { FaMoon } from "react-icons/fa";
 import { AiOutlineLogout, AiOutlinePlus } from "react-icons/ai";
 import { BsTrash, BsPencil } from "react-icons/bs";
+import { FaMoon } from "react-icons/fa";
+
+const ADMIN_EMAIL = "mederbekrahmatullaev7@gmail.com"; // Сенин Gmail
 
 const Admin = () => {
+  const [user, setUser] = useState(null);
   const [category, setCategory] = useState("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [images, setImages] = useState([""]);
   const [products, setProducts] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
 
+  // --- Автоматтык текшерүү ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
-        navigate("/login");
-        setLoading(false);
-      } else {
-        // Проверяем роль пользователя в Firestore
+        // Автоматтык Gmail логин
         try {
-          const userDocRef = doc(db, "users", currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.role === "admin") {
-              setUser(currentUser);
-              setIsAdmin(true);
-              setLoading(false);
-            } else {
-              // Не админ - перенаправляем на главную
-              alert("⛔ У вас нет прав доступа к админ-панели!");
-              navigate("/");
-              setLoading(false);
-            }
-          } else {
-            // Документ пользователя не найден
-            alert("⛔ Пользователь не найден в базе данных!");
-            navigate("/");
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error("Ошибка проверки роли:", error);
-          alert("⛔ Ошибка проверки доступа!");
-          navigate("/");
+          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, prompt("Паролуңузду жазыңыз:"));
+        } catch (e) {
+          alert("❌ Кирүү ката: " + e.message);
+          navigate("/login");
+        }
+      } else {
+        // Текшерүү
+        if (currentUser.email === ADMIN_EMAIL) {
+          setUser(currentUser);
           setLoading(false);
+          fetchProducts();
+        } else {
+          alert("⛔ Бул аккаунт админ эмес!");
+          await signOut(auth);
+          navigate("/");
         }
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchProducts();
-    }
-  }, [user, isAdmin]);
-
+  // --- Товарлар жүктөө ---
   const fetchProducts = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "products"));
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const data = querySnapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
       }));
-      setProducts(productsData);
-    } catch (error) {
-      console.error("Товарларды жүктөөдө ката:", error);
+      setProducts(data);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/login");
+  // --- Жаңы сүрөт кошуу ---
+  const addImageField = () => {
+    if (images.length < 5) setImages([...images, ""]);
   };
 
-  const handleUpload = async () => {
+  const updateImage = (index, value) => {
+    const newImgs = [...images];
+    newImgs[index] = value;
+    setImages(newImgs);
+  };
+
+  // --- Товар сактоо ---
+  const handleSave = async () => {
     if (!category || !title || !price) {
-      alert("Категория, аталышы жана баасы милдеттүү!");
+      alert("⚠️ Бардык талааларды толтуруңуз!");
       return;
     }
-
+    const validImages = images.filter((i) => i.trim() !== "");
     try {
-      const finalImageUrl = imageUrl || "https://via.placeholder.com/400x300?text=No+Image";
-
       if (editingId) {
-        const productRef = doc(db, "products", editingId);
-        await updateDoc(productRef, {
+        await updateDoc(doc(db, "products", editingId), {
           category,
           title,
           price: Number(price),
-          stock: Number(stock) || 0,
-          imageUrl: finalImageUrl,
+          stock: Number(stock),
+          images: validImages,
           updatedAt: new Date(),
         });
-        alert("✅ Товар ийгиликтүү өзгөртүлдү!");
-        setEditingId(null);
+        alert("✅ Товар жаңыртылды!");
       } else {
         await addDoc(collection(db, "products"), {
           category,
           title,
           price: Number(price),
-          stock: Number(stock) || 0,
-          imageUrl: finalImageUrl,
+          stock: Number(stock),
+          images: validImages,
           createdAt: new Date(),
         });
-        alert("✅ Товар ийгиликтүү кошулду!");
+        alert("✅ Жаңы товар кошулду!");
       }
-
-      setCategory("");
-      setTitle("");
-      setPrice("");
-      setStock("");
-      setImageUrl("");
+      resetForm();
       fetchProducts();
-    } catch (error) {
-      console.error(error);
-      alert("❌ Ката кетти, кайра аракет кылыңыз!");
+    } catch (e) {
+      console.error(e);
+      alert("❌ Ката кетти!");
     }
   };
 
-  const handleEdit = (product) => {
-    setEditingId(product.id);
-    setCategory(product.category);
-    setTitle(product.title);
-    setPrice(product.price);
-    setStock(product.stock || 0);
-    setImageUrl(product.imageUrl || "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Бул товарды өчүрөсүзбү?")) {
-      try {
-        await deleteDoc(doc(db, "products", id));
-        alert("✅ Товар өчүрүлдү!");
-        fetchProducts();
-      } catch (error) {
-        console.error(error);
-        alert("❌ Өчүрүүдө ката кетти!");
-      }
-    }
-  };
-
-  const handleCancel = () => {
+  const resetForm = () => {
     setEditingId(null);
     setCategory("");
     setTitle("");
     setPrice("");
     setStock("");
-    setImageUrl("");
+    setImages([""]);
   };
 
-  // Показываем загрузку пока проверяем доступ
-  if (loading) {
+  // --- Товар өчүрүү ---
+  const handleDelete = async (id) => {
+    if (window.confirm("Бул товарды чын эле өчүрөсүзбү?")) {
+      await deleteDoc(doc(db, "products", id));
+      fetchProducts();
+    }
+  };
+
+  // --- Товар өзгөртүү ---
+  const handleEdit = (product) => {
+    setEditingId(product.id);
+    setCategory(product.category);
+    setTitle(product.title);
+    setPrice(product.price);
+    setStock(product.stock);
+    setImages(product.images || [""]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // --- Logout ---
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/login");
+  };
+
+  // --- Scroll effect ---
+  useEffect(() => {
+    const scroll = () => setScrolled(window.scrollY > 30);
+    window.addEventListener("scroll", scroll);
+    return () => window.removeEventListener("scroll", scroll);
+  }, []);
+
+  if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-black mx-auto mb-4"></div>
-          <p className="text-gray-600 font-semibold">Текшерүү...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center text-lg font-semibold text-gray-600">
+        Жүктөлүүдө...
       </div>
     );
-  }
 
-  // Если не админ или нет пользователя - ничего не показываем (перенаправление уже произошло)
-  if (!user || !isAdmin) return null;
+  if (!user) return null;
 
-  const totalProducts = products.length;
-  const totalValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
+  const totalValue = products.reduce(
+    (sum, p) => sum + p.price * (p.stock || 0),
+    0
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header
-        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 shadow-lg ${
-          scrolled ? "bg-white/90 shadow-lg backdrop-blur-md" : "bg-white"
+        className={`fixed top-0 left-0 w-full z-50 shadow-md transition-all ${
+          scrolled ? "bg-white/90 backdrop-blur-md" : "bg-white"
         }`}
       >
-        <div className="max-w-[1400px] mx-auto flex justify-between items-center px-6 py-3 md:py-4">
-          <div className="flex items-center gap-3 cursor-pointer select-none">
-            <FaMoon className="text-3xl text-black" />
-            <span className="text-3xl font-bold text-black tracking-wide">
-              Admin Panel
-            </span>
+        <div className="max-w-[1200px] mx-auto flex justify-between items-center px-5 py-3">
+          <div className="flex items-center gap-2">
+            <FaMoon className="text-2xl" />
+            <h1 className="text-2xl font-bold">Admin Panel</h1>
           </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600 hidden md:block">
-              👤 {user?.email}
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:block text-gray-600 text-sm">
+              {user.email}
             </span>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition-colors font-semibold"
+              className="flex items-center gap-1 bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition"
             >
-              <AiOutlineLogout className="text-xl" />
+              <AiOutlineLogout />
               Чыгуу
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="max-w-[1400px] mx-auto px-6 pt-24 pb-12">
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-black">
-            <p className="text-gray-600 text-sm font-semibold mb-1">Жалпы товарлар</p>
-            <p className="text-3xl font-bold text-black">{totalProducts}</p>
+      <main className="max-w-[1200px] mx-auto px-5 pt-24 pb-10">
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white shadow rounded-lg p-4 text-center">
+            <p className="text-gray-500 text-sm">Жалпы товар</p>
+            <h2 className="text-2xl font-bold">{products.length}</h2>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-600">
-            <p className="text-gray-600 text-sm font-semibold mb-1">Жалпы наркы</p>
-            <p className="text-3xl font-bold text-black">{totalValue.toLocaleString()} сом</p>
+          <div className="bg-white shadow rounded-lg p-4 text-center">
+            <p className="text-gray-500 text-sm">Жалпы нарк</p>
+            <h2 className="text-2xl font-bold">
+              {totalValue.toLocaleString()} сом
+            </h2>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-400">
-            <p className="text-gray-600 text-sm font-semibold mb-1">Категориялар</p>
-            <p className="text-3xl font-bold text-black">{new Set(products.map(p => p.category)).size}</p>
+          <div className="bg-white shadow rounded-lg p-4 text-center hidden sm:block">
+            <p className="text-gray-500 text-sm">Категориялар</p>
+            <h2 className="text-2xl font-bold">
+              {new Set(products.map((p) => p.category)).size}
+            </h2>
           </div>
         </div>
 
-        {/* Add/Edit Form */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 mb-8">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+        {/* Form */}
+        <div className="bg-white shadow-xl rounded-xl p-5 mb-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <AiOutlinePlus />
             {editingId ? "Товарды өзгөртүү" : "Жаңы товар кошуу"}
           </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <select
-              className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 ring-gray-300 transition"
+              className="border p-3 rounded-lg"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
               <option value="">Категория тандаңыз</option>
-              <option value="Одежда">Одежда</option>
-              <option value="Техника">Техника</option>
-              <option value="Спорт">Спорт</option>
-              <option value="Аксессуары">Аксессуары</option>
-              <option value="Обувь">Обувь</option>
-              <option value="Ислам товары">Ислам товары</option>
+              <option>Одежда</option>
+              <option>Техника</option>
+              <option>Обувь</option>
+              <option>Аксессуары</option>
+              <option>Ислам товары</option>
             </select>
 
             <input
               type="text"
-              placeholder="Товардын аталышы"
-              className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 ring-gray-300 transition"
+              placeholder="Товардын аты"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              className="border p-3 rounded-lg"
             />
 
             <input
               type="number"
-              placeholder="Баасы (сом)"
-              className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 ring-gray-300 transition"
+              placeholder="Баасы"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              className="border p-3 rounded-lg"
             />
 
             <input
               type="number"
               placeholder="Саны"
-              className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 ring-gray-300 transition"
               value={stock}
               onChange={(e) => setStock(e.target.value)}
-            />
-
-            <input
-              type="text"
-              placeholder="Сүрөттүн URL (мисалы: https://example.com/image.jpg)"
-              className="border border-gray-300 p-3 rounded-lg md:col-span-2 focus:outline-none focus:ring-2 ring-gray-300 transition"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
+              className="border p-3 rounded-lg"
             />
           </div>
 
-          <div className="flex gap-3 mt-6">
+          {/* Images */}
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2">Сүрөттөр (5 чейин):</h3>
+            {images.map((img, i) => (
+              <input
+                key={i}
+                type="text"
+                placeholder={`Сүрөт ${i + 1} URL`}
+                value={img}
+                onChange={(e) => updateImage(i, e.target.value)}
+                className="border p-2 w-full rounded-lg mb-2"
+              />
+            ))}
+            {images.length < 5 && (
+              <button
+                onClick={addImageField}
+                className="bg-gray-200 hover:bg-gray-300 text-sm px-4 py-2 rounded-lg"
+              >
+                + Дагы сүрөт кошуу
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-3 mt-5">
             <button
-              onClick={handleUpload}
-              className="flex-1 bg-black hover:bg-gray-800 text-white py-3 rounded-lg font-semibold transition"
+              onClick={handleSave}
+              className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition"
             >
-              {editingId ? "Өзгөртүүлөрдү сактоо" : "Товар кошуу"}
+              {editingId ? "Сактоо" : "Кошуу"}
             </button>
             {editingId && (
               <button
-                onClick={handleCancel}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold transition"
+                onClick={resetForm}
+                className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition"
               >
                 Жокко чыгаруу
               </button>
@@ -311,58 +314,48 @@ const Admin = () => {
           </div>
         </div>
 
-        {/* Products Grid */}
-        <h3 className="text-2xl font-bold mb-6 text-gray-800">Товарлар</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map(product => (
-            <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <div className="relative">
-                <img 
-                  src={product.imageUrl} 
-                  alt={product.title}
+        {/* Products */}
+        <h3 className="text-xl font-bold mb-4">Товарлар</h3>
+        {products.length === 0 ? (
+          <p className="text-gray-500">Товар жок</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {products.map((p) => (
+              <div
+                key={p.id}
+                className="bg-white shadow rounded-xl overflow-hidden hover:shadow-lg transition"
+              >
+                <img
+                  src={p.images?.[0] || "https://via.placeholder.com/400x300"}
+                  alt={p.title}
                   className="w-full h-48 object-cover"
                 />
-                <span className="absolute top-3 right-3 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-semibold text-gray-800">
-                  {product.category}
-                </span>
-              </div>
-              
-              <div className="p-4">
-                <h3 className="font-bold text-lg text-black mb-2 truncate">{product.title}</h3>
-                
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-2xl font-bold text-black">{product.price?.toLocaleString()} сом</span>
-                  <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-800">
-                    {product.stock || 0} дана
-                  </span>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                  >
-                    <BsPencil />
-                    Өзгөртүү
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="flex items-center justify-center bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-                  >
-                    <BsTrash />
-                  </button>
+                <div className="p-4">
+                  <h4 className="font-bold text-lg mb-1">{p.title}</h4>
+                  <p className="text-gray-600 text-sm mb-2">{p.category}</p>
+                  <p className="font-semibold text-black mb-2">
+                    {p.price.toLocaleString()} сом
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(p)}
+                      className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-lg py-2 text-sm font-semibold"
+                    >
+                      <BsPencil /> Өзгөртүү
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-2"
+                    >
+                      <BsTrash />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {products.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-xl">Товарлар жок. Биринчи товарыңызды кошуңуз!</p>
+            ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };
