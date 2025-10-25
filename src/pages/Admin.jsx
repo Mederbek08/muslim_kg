@@ -1,361 +1,460 @@
 import React, { useState, useEffect } from "react";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc,
-  getDoc,
-} from "firebase/firestore";
-import { auth, db } from "../firebase";
-import { useNavigate } from "react-router-dom";
-import { AiOutlineLogout, AiOutlinePlus } from "react-icons/ai";
-import { BsTrash, BsPencil } from "react-icons/bs";
-import { FaMoon } from "react-icons/fa";
-
-const ADMIN_EMAIL = "mederbekrahmatullaev7@gmail.com"; // Сенин Gmail
+import { LogOut, Plus, Trash2, Edit2, Image as ImageIcon, Moon } from "lucide-react";
 
 const Admin = () => {
-  const [user, setUser] = useState(null);
   const [category, setCategory] = useState("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [images, setImages] = useState([""]);
+  const [description, setDescription] = useState("");
+  const [images, setImages] = useState([null, null, null]);
+  const [imageUrls, setImageUrls] = useState(["", "", ""]);
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [products, setProducts] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
 
-  // --- Автоматтык текшерүү ---
+  // Колдонуучунун ролун текшерүү
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
-        // Автоматтык Gmail логин
-        try {
-          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, prompt("Паролуңузду жазыңыз:"));
-        } catch (e) {
-          alert("❌ Кирүү ката: " + e.message);
-          navigate("/login");
-        }
+        navigate("/login");
+        setLoading(false);
       } else {
-        // Текшерүү
-        if (currentUser.email === ADMIN_EMAIL) {
-          setUser(currentUser);
-          setLoading(false);
-          fetchProducts();
-        } else {
-          alert("⛔ Бул аккаунт админ эмес!");
-          await signOut(auth);
+        try {
+          const userDocRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists() && userDoc.data().role === "admin") {
+            setUser(currentUser);
+            setIsAdmin(true);
+            setLoading(false);
+          } else {
+            alert("⛔ Сизде админ панелге кирүү укугу жок!");
+            navigate("/");
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error("Ката:", error);
+          alert("⛔ Катчылык!");
           navigate("/");
+          setLoading(false);
         }
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // --- Товарлар жүктөө ---
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchProducts();
+    }
+  }, [user, isAdmin]);
+
   const fetchProducts = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "products"));
-      const data = querySnapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
+      const productsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
       }));
-      setProducts(data);
-    } catch (e) {
-      console.error(e);
+      setProducts(productsData);
+    } catch (error) {
+      console.error("Товарларды жүктөөдө ката:", error);
     }
   };
 
-  // --- Жаңы сүрөт кошуу ---
-  const addImageField = () => {
-    if (images.length < 5) setImages([...images, ""]);
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/");
   };
 
-  const updateImage = (index, value) => {
-    const newImgs = [...images];
-    newImgs[index] = value;
-    setImages(newImgs);
+  // Сүрөттөрдү жүктөө
+  const handleImageChange = (e, index) => {
+    const file = e.target.files[0];
+    if (file) {
+      const newImages = [...images];
+      newImages[index] = file;
+      setImages(newImages);
+      
+      // Preview үчүн
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newUrls = [...imageUrls];
+        newUrls[index] = reader.result;
+        setImageUrls(newUrls);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  // --- Товар сактоо ---
-  const handleSave = async () => {
+  // Сүрөттөрдү Firebase Storage'га жүктөө
+  const uploadImages = async () => {
+    const urls = [];
+    setUploading(true);
+    
+    try {
+      for (let i = 0; i < images.length; i++) {
+        if (images[i]) {
+          const imageRef = ref(storage, `products/${Date.now()}_${i}_${images[i].name}`);
+          await uploadBytes(imageRef, images[i]);
+          const url = await getDownloadURL(imageRef);
+          urls.push(url);
+        } else if (imageUrls[i] && imageUrls[i].startsWith('http')) {
+          urls.push(imageUrls[i]);
+        }
+      }
+      setUploading(false);
+      return urls;
+    } catch (error) {
+      setUploading(false);
+      console.error("Сүрөт жүктөөдө ката:", error);
+      return urls;
+    }
+  };
+
+  const handleUpload = async () => {
     if (!category || !title || !price) {
-      alert("⚠️ Бардык талааларды толтуруңуз!");
+      alert("❌ Категория, аталышы жана баасы милдеттүү!");
       return;
     }
-    const validImages = images.filter((i) => i.trim() !== "");
+
     try {
+      const uploadedUrls = await uploadImages();
+      
+      const productData = {
+        category,
+        title,
+        price: Number(price),
+        stock: Number(stock) || 0,
+        description: description || "",
+        imageUrl: uploadedUrls[0] || "https://via.placeholder.com/400x300?text=No+Image",
+        additionalImages: uploadedUrls.slice(1),
+        updatedAt: new Date(),
+      };
+
       if (editingId) {
-        await updateDoc(doc(db, "products", editingId), {
-          category,
-          title,
-          price: Number(price),
-          stock: Number(stock),
-          images: validImages,
-          updatedAt: new Date(),
-        });
-        alert("✅ Товар жаңыртылды!");
+        const productRef = doc(db, "products", editingId);
+        await updateDoc(productRef, productData);
+        alert("✅ Товар ийгиликтүү өзгөртүлдү!");
+        setEditingId(null);
       } else {
         await addDoc(collection(db, "products"), {
-          category,
-          title,
-          price: Number(price),
-          stock: Number(stock),
-          images: validImages,
+          ...productData,
           createdAt: new Date(),
         });
-        alert("✅ Жаңы товар кошулду!");
+        alert("✅ Товар ийгиликтүү кошулду!");
       }
-      resetForm();
+
+      // Форманы тазалоо
+      setCategory("");
+      setTitle("");
+      setPrice("");
+      setStock("");
+      setDescription("");
+      setImages([null, null, null]);
+      setImageUrls(["", "", ""]);
       fetchProducts();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       alert("❌ Ката кетти!");
     }
   };
 
-  const resetForm = () => {
-    setEditingId(null);
-    setCategory("");
-    setTitle("");
-    setPrice("");
-    setStock("");
-    setImages([""]);
-  };
-
-  // --- Товар өчүрүү ---
-  const handleDelete = async (id) => {
-    if (window.confirm("Бул товарды чын эле өчүрөсүзбү?")) {
-      await deleteDoc(doc(db, "products", id));
-      fetchProducts();
-    }
-  };
-
-  // --- Товар өзгөртүү ---
   const handleEdit = (product) => {
     setEditingId(product.id);
     setCategory(product.category);
     setTitle(product.title);
     setPrice(product.price);
-    setStock(product.stock);
-    setImages(product.images || [""]);
+    setStock(product.stock || 0);
+    setDescription(product.description || "");
+    setImageUrls([
+      product.imageUrl || "",
+      product.additionalImages?.[0] || "",
+      product.additionalImages?.[1] || ""
+    ]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // --- Logout ---
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/login");
+  const handleDelete = async (id) => {
+    if (window.confirm("❓ Бул товарды өчүрөсүзбү?")) {
+      try {
+        await deleteDoc(doc(db, "products", id));
+        alert("✅ Товар өчүрүлдү!");
+        fetchProducts();
+      } catch (error) {
+        console.error(error);
+        alert("❌ Өчүрүүдө ката!");
+      }
+    }
   };
 
-  // --- Scroll effect ---
-  useEffect(() => {
-    const scroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener("scroll", scroll);
-    return () => window.removeEventListener("scroll", scroll);
-  }, []);
+  const handleCancel = () => {
+    setEditingId(null);
+    setCategory("");
+    setTitle("");
+    setPrice("");
+    setStock("");
+    setDescription("");
+    setImages([null, null, null]);
+    setImageUrls(["", "", ""]);
+  };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-lg font-semibold text-gray-600">
-        Жүктөлүүдө...
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-white mx-auto mb-4"></div>
+          <p className="text-white text-xl font-semibold">Жүктөлүүдө...</p>
+        </div>
       </div>
     );
+  }
 
-  if (!user) return null;
+  if (!user || !isAdmin) return null;
 
-  const totalValue = products.reduce(
-    (sum, p) => sum + p.price * (p.stock || 0),
-    0
-  );
+  const totalProducts = products.length;
+  const totalValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header
-        className={`fixed top-0 left-0 w-full z-50 shadow-md transition-all ${
-          scrolled ? "bg-white/90 backdrop-blur-md" : "bg-white"
-        }`}
-      >
-        <div className="max-w-[1200px] mx-auto flex justify-between items-center px-5 py-3">
-          <div className="flex items-center gap-2">
-            <FaMoon className="text-2xl" />
-            <h1 className="text-2xl font-bold">Admin Panel</h1>
-          </div>
+      <header className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-white/95 shadow-lg backdrop-blur-md" : "bg-white"}`}>
+        <div className="max-w-7xl mx-auto flex justify-between items-center px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="hidden sm:block text-gray-600 text-sm">
-              {user.email}
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+              <FaMoon className="text-2xl text-white" />
+            </div>
+            <div>
+              <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+                Admin Panel
+              </span>
+              <p className="text-xs text-gray-500">Muslim_kg</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600 hidden md:block">
+              👤 {user?.email}
             </span>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1 bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition"
+              className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-5 py-2.5 rounded-xl hover:shadow-lg transition-all font-semibold"
             >
-              <AiOutlineLogout />
-              Чыгуу
+              <AiOutlineLogout className="text-xl" />
+              <span className="hidden sm:inline">Чыгуу</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-5 pt-24 pb-10">
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white shadow rounded-lg p-4 text-center">
-            <p className="text-gray-500 text-sm">Жалпы товар</p>
-            <h2 className="text-2xl font-bold">{products.length}</h2>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-28 pb-12">
+        {/* Статистика */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl p-6 text-white">
+            <p className="text-sm opacity-90 mb-2">Жалпы товарлар</p>
+            <p className="text-4xl font-bold">{totalProducts}</p>
           </div>
-          <div className="bg-white shadow rounded-lg p-4 text-center">
-            <p className="text-gray-500 text-sm">Жалпы нарк</p>
-            <h2 className="text-2xl font-bold">
-              {totalValue.toLocaleString()} сом
-            </h2>
+          
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl p-6 text-white">
+            <p className="text-sm opacity-90 mb-2">Жалпы наркы</p>
+            <p className="text-4xl font-bold">{totalValue.toLocaleString()} ₽</p>
           </div>
-          <div className="bg-white shadow rounded-lg p-4 text-center hidden sm:block">
-            <p className="text-gray-500 text-sm">Категориялар</p>
-            <h2 className="text-2xl font-bold">
-              {new Set(products.map((p) => p.category)).size}
-            </h2>
+          
+          <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl shadow-xl p-6 text-white">
+            <p className="text-sm opacity-90 mb-2">Категориялар</p>
+            <p className="text-4xl font-bold">{new Set(products.map(p => p.category)).size}</p>
           </div>
         </div>
 
-        {/* Form */}
-        <div className="bg-white shadow-xl rounded-xl p-5 mb-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        {/* Форма */}
+        <div className="bg-white shadow-2xl rounded-3xl p-6 sm:p-8 mb-8">
+          <h2 className="text-3xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent flex items-center gap-3">
             <AiOutlinePlus />
             {editingId ? "Товарды өзгөртүү" : "Жаңы товар кошуу"}
           </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <select
-              className="border p-3 rounded-lg"
+              className="border-2 border-gray-300 p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-gray-50"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              <option value="">Категория тандаңыз</option>
-              <option>Одежда</option>
-              <option>Техника</option>
-              <option>Обувь</option>
-              <option>Аксессуары</option>
-              <option>Ислам товары</option>
+              <option value="">📂 Категория тандаңыз</option>
+              <option value="Одежда">👕 Одежда</option>
+              <option value="Техника">📱 Техника</option>
+              <option value="Спорт">⚽ Спорт</option>
+              <option value="Аксессуары">👜 Аксессуары</option>
+              <option value="Обувь">👟 Обувь</option>
+              <option value="Ислам товары">🕌 Ислам товары</option>
             </select>
 
             <input
               type="text"
-              placeholder="Товардын аты"
+              placeholder="📝 Товардын аталышы"
+              className="border-2 border-gray-300 p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-gray-50"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="border p-3 rounded-lg"
             />
 
             <input
               type="number"
-              placeholder="Баасы"
+              placeholder="💰 Баасы (сом)"
+              className="border-2 border-gray-300 p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-gray-50"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="border p-3 rounded-lg"
             />
 
             <input
               type="number"
-              placeholder="Саны"
+              placeholder="📦 Саны"
+              className="border-2 border-gray-300 p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-gray-50"
               value={stock}
               onChange={(e) => setStock(e.target.value)}
-              className="border p-3 rounded-lg"
+            />
+
+            <textarea
+              placeholder="📄 Товар жөнүндө маалымат..."
+              className="border-2 border-gray-300 p-4 rounded-xl md:col-span-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition h-32 bg-gray-50"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
-          {/* Images */}
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2">Сүрөттөр (5 чейин):</h3>
-            {images.map((img, i) => (
-              <input
-                key={i}
-                type="text"
-                placeholder={`Сүрөт ${i + 1} URL`}
-                value={img}
-                onChange={(e) => updateImage(i, e.target.value)}
-                className="border p-2 w-full rounded-lg mb-2"
-              />
-            ))}
-            {images.length < 5 && (
-              <button
-                onClick={addImageField}
-                className="bg-gray-200 hover:bg-gray-300 text-sm px-4 py-2 rounded-lg"
-              >
-                + Дагы сүрөт кошуу
-              </button>
-            )}
+          {/* Сүрөттөр жүктөө */}
+          <div className="mt-6">
+            <h3 className="text-xl font-bold mb-4 text-gray-800">📸 Сүрөттөр (3 чейин)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="relative">
+                  <label className="cursor-pointer">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-purple-500 transition h-48 flex items-center justify-center bg-gray-50">
+                      {imageUrls[index] ? (
+                        <img src={imageUrls[index]} alt={`Preview ${index + 1}`} className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <div className="text-center">
+                          <BsImage className="text-4xl text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">Сүрөт {index + 1}</p>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageChange(e, index)}
+                      className="hidden"
+                    />
+                  </label>
+                  {imageUrls[index] && (
+                    <button
+                      onClick={() => {
+                        const newUrls = [...imageUrls];
+                        newUrls[index] = "";
+                        setImageUrls(newUrls);
+                        const newImages = [...images];
+                        newImages[index] = null;
+                        setImages(newImages);
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+                    >
+                      <BsTrash />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="flex gap-3 mt-5">
+          <div className="flex gap-3 mt-8">
             <button
-              onClick={handleSave}
-              className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition"
+              onClick={handleUpload}
+              disabled={uploading}
+              className="flex-1 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg hover:shadow-xl disabled:opacity-50"
             >
-              {editingId ? "Сактоо" : "Кошуу"}
+              {uploading ? "Жүктөлүүдө..." : editingId ? "✅ Сактоо" : "➕ Кошуу"}
             </button>
             {editingId && (
               <button
-                onClick={resetForm}
-                className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition"
+                onClick={handleCancel}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-4 rounded-xl font-bold text-lg transition"
               >
-                Жокко чыгаруу
+                ❌ Жокко чыгаруу
               </button>
             )}
           </div>
         </div>
 
-        {/* Products */}
-        <h3 className="text-xl font-bold mb-4">Товарлар</h3>
-        {products.length === 0 ? (
-          <p className="text-gray-500">Товар жок</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className="bg-white shadow rounded-xl overflow-hidden hover:shadow-lg transition"
-              >
-                <img
-                  src={p.images?.[0] || "https://via.placeholder.com/400x300"}
-                  alt={p.title}
-                  className="w-full h-48 object-cover"
+        {/* Товарлар тизмеси */}
+        <h3 className="text-3xl font-bold mb-6 text-gray-800">📦 Товарлар</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map(product => (
+            <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all">
+              <div className="relative h-56">
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.title}
+                  className="w-full h-full object-cover"
                 />
-                <div className="p-4">
-                  <h4 className="font-bold text-lg mb-1">{p.title}</h4>
-                  <p className="text-gray-600 text-sm mb-2">{p.category}</p>
-                  <p className="font-semibold text-black mb-2">
-                    {p.price.toLocaleString()} сом
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(p)}
-                      className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-lg py-2 text-sm font-semibold"
-                    >
-                      <BsPencil /> Өзгөртүү
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-2"
-                    >
-                      <BsTrash />
-                    </button>
+                <span className="absolute top-3 right-3 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-full text-sm font-bold shadow-lg">
+                  {product.category}
+                </span>
+              </div>
+              
+              <div className="p-5">
+                <h3 className="font-bold text-xl text-gray-800 mb-3 line-clamp-2">{product.title}</h3>
+                
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Баасы:</p>
+                    <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+                      {product.price?.toLocaleString()} ₽
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Саны:</p>
+                    <p className="text-2xl font-bold text-gray-800">
+                      {product.stock || 0}
+                    </p>
                   </div>
                 </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(product)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-3 rounded-xl hover:bg-blue-600 transition font-semibold"
+                  >
+                    <BsPencil />
+                    Өзгөртүү
+                  </button>
+                  <button
+                    onClick={() => handleDelete(product.id)}
+                    className="flex items-center justify-center bg-red-500 text-white px-4 py-3 rounded-xl hover:bg-red-600 transition"
+                  >
+                    <BsTrash />
+                  </button>
+                </div>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+
+        {products.length === 0 && (
+          <div className="text-center py-20 text-gray-500">
+            <p className="text-2xl">📦 Товарлар жок. Биринчи товарыңызды кошуңуз!</p>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 };
